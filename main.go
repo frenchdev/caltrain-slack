@@ -5,12 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
 )
 
 func main() {
+	port := os.Getenv("PORT")
+
+	if port == "" {
+		log.Fatal("$PORT must be set")
+	}
+
 	http.HandleFunc("/", handler)
-	http.ListenAndServe(":3001", nil)
+	http.ListenAndServe(":"+port, nil)
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -37,7 +45,7 @@ func nextCaltrain() string {
 	return nothing
 }
 
-func getStops(stopsFilePath string) *[]model.Stop {
+func getStops(stopsFilePath string) *map[int]model.Stop {
 	stopsFile, err := ioutil.ReadFile(stopsFilePath)
 	if err != nil {
 		fmt.Println("opening stops file: ", err)
@@ -50,7 +58,13 @@ func getStops(stopsFilePath string) *[]model.Stop {
 		fmt.Println("error:", err)
 	}
 
-	return &stops
+	var stopMap map[int]model.Stop
+
+	for _, stop := range stops {
+		stopMap[stop.StopID] = stop
+	}
+
+	return &stopMap
 }
 
 func getStoptimes(stoptimesFilePath string) *[]model.StopTime {
@@ -67,4 +81,14 @@ func getStoptimes(stoptimesFilePath string) *[]model.StopTime {
 	}
 
 	return &stoptimes
+}
+
+func mapStop(stops *[]model.Stop) *map[int]model.Stop {
+	var stopMap map[int]model.Stop
+
+	for _, stop := range *stops {
+		stopMap[stop.StopID] = stop
+	}
+
+	return &stopMap
 }

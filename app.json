@@ -1,0 +1,9 @@
+{
+  "name": "caltrain-slack",
+  "description": "",
+  "keywords": [
+    "slack",
+    "caltrain"
+  ],
+  "image": "heroku/go:1.6"
+}
