@@ -5,12 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
 )
 
 func main() {
+	port := os.Getenv("PORT")
+
+	if port == "" {
+		log.Fatal("$PORT must be set")
+	}
+
 	http.HandleFunc("/", handler)
-	http.ListenAndServe(":3001", nil)
+	http.ListenAndServe(":"+port, nil)
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
