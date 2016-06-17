@@ -5,5 +5,10 @@
     "slack",
     "caltrain"
   ],
-  "image": "heroku/go:1.6"
+  "image": "heroku/go:1.6",
+  "formation": {
+    "web": {
+      "quantity": 1
+    }
+  }
 }
