@@ -1,17 +1,19 @@
 package main
 
 import (
-	"caltrain-slack/model"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	_"log"
+	_ "log"
 	"net/http"
 	"os"
-	"github.com/gocraft/web"
 	"os/exec"
-	"time"
+	"path/filepath"
 	"strconv"
+	"time"
+
+	"github.com/frenchdev/caltrain-slack/model"
+	"github.com/gocraft/web"
 )
 
 type Context struct {
@@ -19,7 +21,7 @@ type Context struct {
 }
 
 type StopDir struct {
-	StopName string
+	StopName  string
 	Direction string
 }
 
@@ -42,9 +44,9 @@ func main() {
 		port = "5000"
 	}
 	//cleanJson()
-	_MapStopByID = getStops("src/caltrain-slack/gtfs/stops.json")
+	_MapStopByID = getStops("./gtfs/stops.json")
 	_MapStopIDByName = setMapStopIDByName(_MapStopByID)
-	_MapTimesByID = setMapTimesByID(getStoptimes("src/caltrain-slack/gtfs/stoptimes.json"))
+	_MapTimesByID = setMapTimesByID(getStoptimes("./gtfs/stoptimes.json"))
 
 	router := web.New(Context{}).
 		Middleware(web.LoggerMiddleware).
@@ -87,7 +89,7 @@ func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
 		idx = len(nextTrains) - 1
 	}
 
-	if len(nextTrains) > idx + 3 {
+	if len(nextTrains) > idx+3 {
 		//fmt.Fprint(rw, json.Marshal(nextTrains[idx:idx+3]))
 		fmt.Fprint(rw, nextTrains[idx:idx+3])
 	} else {
@@ -99,6 +101,7 @@ func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
 }
 
 func getStops(stopsFilePath string) *map[int]model.Stop {
+	stopsFilePath, _ = filepath.Abs(stopsFilePath)
 	stopsFile, err := ioutil.ReadFile(stopsFilePath)
 	if err != nil {
 		fmt.Println("opening stops file: ", err)
@@ -121,6 +124,7 @@ func getStops(stopsFilePath string) *map[int]model.Stop {
 }
 
 func getStoptimes(stoptimesFilePath string) *[]model.StopTime {
+	stoptimesFilePath, _ = filepath.Abs(stoptimesFilePath)
 	stoptimesFile, err := ioutil.ReadFile(stoptimesFilePath)
 	if err != nil {
 		fmt.Println("opening stops file: ", err)
@@ -141,10 +145,10 @@ func setMapStopIDByName(stops *map[int]model.Stop) *map[string]int {
 	stopIDByName := make(map[string]int)
 	for k, v := range *stops {
 		if v.PlatformCode == "NB" {
-			_StopDir :=  "NB_" + v.StopName
+			_StopDir := "NB_" + v.StopName
 			stopIDByName[_StopDir] = k
 		} else {
-			_StopDir :=  "SB_" + v.StopName
+			_StopDir := "SB_" + v.StopName
 			stopIDByName[_StopDir] = k
 		}
 	}
