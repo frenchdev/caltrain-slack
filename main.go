@@ -5,44 +5,97 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
+	_"log"
 	"net/http"
 	"os"
+	"github.com/gocraft/web"
+	"os/exec"
+	"time"
+	"strconv"
 )
+
+type Context struct {
+	HelloCount int
+}
+
+type StopDir struct {
+	StopName string
+	Direction string
+}
+
+var _MapStopByID *map[int]model.Stop
+var _MapStopIDByName *map[string]int
+var _MapTimesByID *map[int][]string
+
+func cleanJson() {
+	cmd := exec.Command("python $HOME/go/src/caltrain-slack/python/jsonCleaner.py")
+	//cmd := exec.Command("cd $GOPATH")
+	fmt.Println(cmd.Run())
+}
 
 func main() {
 	port := os.Getenv("PORT")
 
 	if port == "" {
-		log.Fatal("$PORT must be set")
+		//log.Fatal("$PORT must be set")
+		// for testing
+		port = "5000"
 	}
+	//cleanJson()
+	_MapStopByID = getStops("src/caltrain-slack/gtfs/stops.json")
+	_MapStopIDByName = setMapStopIDByName(_MapStopByID)
+	_MapTimesByID = setMapTimesByID(getStoptimes("src/caltrain-slack/gtfs/stoptimes.json"))
 
-	http.HandleFunc("/", handler)
-	http.ListenAndServe(":"+port, nil)
+	router := web.New(Context{}).
+		Middleware(web.LoggerMiddleware).
+		Middleware(web.ShowErrorsMiddleware).
+		NotFound((*Context).NotFound).
+		Get("/next/:direction/:stop_name", (*Context).FindStop)
+	http.ListenAndServe("localhost:"+port, router)
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
-	// var (
-	// 	response string
-	// 	err      error
-	// )
-	switch r.URL.Path[1:] {
-	case "next":
-
-		//response := url.ParseQuery(r.URL.RawQuery)
-		//jsonString := json.Marshal(response)
-		fmt.Println("query: ", r.URL.RawQuery)
-		fmt.Fprintf(w, "coucou")
-	default:
-		response := "Not implemented"
-		fmt.Fprintf(w, response)
-	}
-
+func (c *Context) NotFound(rw web.ResponseWriter, r *web.Request) {
+	rw.WriteHeader(http.StatusNotFound)
+	fmt.Fprintf(rw, "Not Found")
 }
 
-func nextCaltrain() string {
-	nothing := "The next caltrain is"
-	return nothing
+func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
+	//fmt.Fprint(rw, "Northbound: ", req.PathParams["direction"])
+	//fmt.Fprint(rw, "Stop Name: ", req.PathParams["stop_name"])
+
+	direction := req.PathParams["direction"]
+	if direction != "NB" && direction != "SB" {
+		rw.Header().Set("Location", "/")
+		rw.WriteHeader(http.StatusMovedPermanently)
+	}
+	stopName := req.PathParams["direction"]
+	if stopName == "" {
+		rw.Header().Set("Location", "/")
+		rw.WriteHeader(http.StatusMovedPermanently)
+	}
+
+	hr, min, sec := time.Now().Clock()
+	stringTime := strconv.Itoa(hr) + ":" + strconv.Itoa(min) + ":" + strconv.Itoa(sec)
+
+	stopDir := direction + "_" + stopName
+	stopID := (*_MapStopIDByName)[stopDir]
+
+	nextTrains := (*_MapTimesByID)[stopID]
+
+	idx := findTimeIdx(&stringTime, &nextTrains)
+	if idx == -1 {
+		idx = len(nextTrains) - 1
+	}
+
+	if len(nextTrains) > idx + 3 {
+		//fmt.Fprint(rw, json.Marshal(nextTrains[idx:idx+3]))
+		fmt.Fprint(rw, nextTrains[idx:idx+3])
+	} else {
+		//fmt.Fprint(rw, json.Marshal(nextTrains[idx:]))
+		fmt.Fprint(rw, nextTrains[idx:])
+	}
+
+	//fmt.Println(nextTrains[])
 }
 
 func getStops(stopsFilePath string) *map[int]model.Stop {
@@ -58,7 +111,7 @@ func getStops(stopsFilePath string) *map[int]model.Stop {
 		fmt.Println("error:", err)
 	}
 
-	var stopMap map[int]model.Stop
+	stopMap := make(map[int]model.Stop)
 
 	for _, stop := range stops {
 		stopMap[stop.StopID] = stop
@@ -83,12 +136,44 @@ func getStoptimes(stoptimesFilePath string) *[]model.StopTime {
 	return &stoptimes
 }
 
-func mapStop(stops *[]model.Stop) *map[int]model.Stop {
-	var stopMap map[int]model.Stop
+// to translate request from Stop name to Stop ID
+func setMapStopIDByName(stops *map[int]model.Stop) *map[string]int {
+	stopIDByName := make(map[string]int)
+	for k, v := range *stops {
+		if v.PlatformCode == "NB" {
+			_StopDir :=  "NB_" + v.StopName
+			stopIDByName[_StopDir] = k
+		} else {
+			_StopDir :=  "SB_" + v.StopName
+			stopIDByName[_StopDir] = k
+		}
+	}
+	return &stopIDByName
+}
 
-	for _, stop := range *stops {
-		stopMap[stop.StopID] = stop
+func setMapTimesByID(stopTimes *[]model.StopTime) *map[int][]string {
+	timesByID := make(map[int][]string)
+	var _emptyList []string
+
+	// init map
+	for k, _ := range *_MapStopByID {
+		timesByID[k] = _emptyList
 	}
 
-	return &stopMap
+	for _, stopTime := range *stopTimes {
+		if _, ok := timesByID[stopTime.StopID]; ok {
+			timesByID[stopTime.StopID] = append(timesByID[stopTime.StopID], stopTime.DepartureTime)
+		}
+	}
+
+	return &timesByID
+}
+
+func findTimeIdx(time *string, times *[]string) int {
+	for k, v := range *times {
+		if *time > v {
+			return k - 1
+		}
+	}
+	return -1
 }
