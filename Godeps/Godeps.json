@@ -2,5 +2,11 @@
 	"ImportPath": "caltrain-slack",
 	"GoVersion": "go1.6",
 	"GodepVersion": "v74",
-	"Deps": []
+	"Deps": [
+		{
+			"ImportPath": "github.com/gocraft/web",
+			"Comment": "v1.1-28-g12b4630",
+			"Rev": "12b4630b4fee3e485b334c4d544bd9dd68fb3d4f"
+		}
+	]
 }

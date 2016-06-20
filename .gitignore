@@ -1,3 +1,4 @@
 ./gtfs
 !./gtfs/.gitkeep
 gin-bin.exe
+vendor
