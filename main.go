@@ -39,7 +39,7 @@ func main() {
 	if port == "" {
 		//log.Fatal("$PORT must be set")
 		// for testing
-		port = "5000"
+		port = "5001"
 	}
 	//cleanJson()
 	_MapStopByID = getStops("src/caltrain-slack/gtfs/stops.json")
@@ -60,8 +60,6 @@ func (c *Context) NotFound(rw web.ResponseWriter, r *web.Request) {
 }
 
 func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
-	//fmt.Fprint(rw, "Northbound: ", req.PathParams["direction"])
-	//fmt.Fprint(rw, "Stop Name: ", req.PathParams["stop_name"])
 
 	direction := req.PathParams["direction"]
 	if direction != "NB" && direction != "SB" {
@@ -90,7 +88,7 @@ func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
 	if len(nextTrains) > idx + 3 {
 		//fmt.Fprint(rw, json.Marshal(nextTrains[idx:idx+3]))
 		fmt.Fprint(rw, nextTrains[idx:idx+3])
-	} else {
+	} else if len(nextTrains) > idx { // should be a else only
 		//fmt.Fprint(rw, json.Marshal(nextTrains[idx:]))
 		fmt.Fprint(rw, nextTrains[idx:])
 	}
@@ -162,6 +160,7 @@ func setMapTimesByID(stopTimes *[]model.StopTime) *map[int][]string {
 
 	for _, stopTime := range *stopTimes {
 		if _, ok := timesByID[stopTime.StopID]; ok {
+			// needs to be ordered
 			timesByID[stopTime.StopID] = append(timesByID[stopTime.StopID], stopTime.DepartureTime)
 		}
 	}
