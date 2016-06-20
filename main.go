@@ -42,9 +42,9 @@ func main() {
 		port = "5000"
 	}
 	//cleanJson()
-	_MapStopByID = getStops("./gtfs/stops.json")
+	_MapStopByID = getStops("src/caltrain-slack/gtfs/stops.json")
 	_MapStopIDByName = setMapStopIDByName(_MapStopByID)
-	_MapTimesByID = setMapTimesByID(getStoptimes("./gtfs/stoptimes.json"))
+	_MapTimesByID = setMapTimesByID(getStoptimes("src/caltrain-slack/gtfs/stoptimes.json"))
 
 	router := web.New(Context{}).
 		Middleware(web.LoggerMiddleware).
