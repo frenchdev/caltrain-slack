@@ -12,8 +12,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/frenchdev/caltrain-slack/model"
+	"caltrain-slack/model"
 	"github.com/gocraft/web"
+	"sort"
 )
 
 type Context struct {
@@ -68,7 +69,7 @@ func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
 		rw.Header().Set("Location", "/")
 		rw.WriteHeader(http.StatusMovedPermanently)
 	}
-	stopName := req.PathParams["direction"]
+	stopName := req.PathParams["stop_name"]
 	if stopName == "" {
 		rw.Header().Set("Location", "/")
 		rw.WriteHeader(http.StatusMovedPermanently)
@@ -77,6 +78,7 @@ func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
 	hr, min, sec := time.Now().Clock()
 	stringTime := strconv.Itoa(hr) + ":" + strconv.Itoa(min) + ":" + strconv.Itoa(sec)
 
+	stringTime = "17:39:00"
 	stopDir := direction + "_" + stopName
 	stopID := (*_MapStopIDByName)[stopDir]
 
@@ -89,9 +91,11 @@ func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
 
 	if len(nextTrains) > idx+3 {
 		//fmt.Fprint(rw, json.Marshal(nextTrains[idx:idx+3]))
+		fmt.Fprint(rw, idx)
 		fmt.Fprint(rw, nextTrains[idx:idx+3])
 	} else if len(nextTrains) > idx { // should be a else only
 		//fmt.Fprint(rw, json.Marshal(nextTrains[idx:]))
+		fmt.Fprint(rw, idx)
 		fmt.Fprint(rw, nextTrains[idx:])
 	}
 
@@ -164,19 +168,31 @@ func setMapTimesByID(stopTimes *[]model.StopTime) *map[int][]string {
 
 	for _, stopTime := range *stopTimes {
 		if _, ok := timesByID[stopTime.StopID]; ok {
-			// needs to be ordered
+			//i := sort.Search(len(timesByID[stopTime.StopID]), func(i int) bool { return timesByID[stopTime.StopID][i] >= stopTime.DepartureTime })
 			timesByID[stopTime.StopID] = append(timesByID[stopTime.StopID], stopTime.DepartureTime)
+			//if i < len(timesByID[stopTime.StopID]) {
+			//	timesByID[stopTime.StopID] = append(timesByID[stopTime.StopID], stopTime.DepartureTime)
+			//} else {
+			//	timesByID[stopTime.StopID] = append(timesByID[stopTime.StopID], stopTime.DepartureTime)
+			//}
 		}
+	}
+
+	for _, v := range timesByID {
+		sort.Strings(v)
 	}
 
 	return &timesByID
 }
 
 func findTimeIdx(time *string, times *[]string) int {
-	for k, v := range *times {
-		if *time > v {
-			return k - 1
-		}
-	}
-	return -1
+	//i := sort.Search(len(*times), func(i int) bool { return (*times)[i] >= time })
+	return sort.Search(len(*times), func(i int) bool { return (*times)[i] >= *time })
+
+	//for k, v := range *times {
+	//	if *time > v {
+	//		return k - 1
+	//	}
+	//}
+	//return -1
 }
