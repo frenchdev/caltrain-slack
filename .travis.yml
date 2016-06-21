@@ -1,9 +1,11 @@
 language: go
-go: 
- - 1.3
- - 1.4
- - 1.5
- - tip
-
+go:
+- 1.3
+- 1.4
+- 1.5
+- tip
 script:
- - go build
+- go build
+notifications:
+  slack:
+    secure: J0u7QKP0nM0VUnkH7snTl6cfIGKdfvyvtU/zF9wPa+tr83Sl5uWwASpLqrB00mzMgvSPBeE5nQpGTZKFl5zHZgl9mxx3Nhigo8W5WQ80deC/2jt3DiKN/Wel2sfll0P6r19Wwktywq2TW/VeyMTlJAq0fOwZHKqJhc7QnVabS8Hk5tdE+QwI/5K5UaNAGTeXk0PWvnxTBdFKxDcuBzKblhQAnUCxDutvNQetbXx2uW2to7UQRTFvSWnFS7lcWIaABSrO0zfeurILPe23WHD/Z+mrmw7drlgWcGbSu9M1rhlUVdOiUtwe7wbDbgIlne6m+Pc6ezCPVSZNpipzDC4RQkqrKBn3S5CfuJldqovRVmQRq7+6iS7PBts8Cyys1P4bTtwwqr9SDeghumHCNWe+ABPxjQdZ1vh3CY1LcRwzyV+kwhsKczNkyOOJp46+aXpo8e674G9dQI0USzqSkQfxvaw3rtm0WlWrATe41IHMoL4oD/7hjrrChMv1dP7/kKpsXYj1Nia7Tre9ZwgbM/GNUu23HggTlKvTqbewyn9OmAiLqqoAVQFGapnBMeLPci9gqd1s7sLPmdcHqEt0AauCuMei/EKnyzeGzQlNiqnb0jn3UuFpRtejgW+4LfGLVH3kR0aO2toApt+uNq9KLWj7j8XVBp+Zh+qINrRGQPkGlx4=
