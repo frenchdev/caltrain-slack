@@ -12,9 +12,10 @@ import (
 	"strconv"
 	"time"
 
-	"caltrain-slack/model"
-	"github.com/gocraft/web"
 	"sort"
+
+	"github.com/frenchdev/caltrain-slack/model"
+	"github.com/gocraft/web"
 )
 
 type Context struct {
