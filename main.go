@@ -18,10 +18,12 @@ import (
 	"github.com/gocraft/web"
 )
 
+//Context context
 type Context struct {
 	HelloCount int
 }
 
+//StopDir stop dir
 type StopDir struct {
 	StopName  string
 	Direction string
@@ -31,7 +33,7 @@ var _MapStopByID *map[int]model.Stop
 var _MapStopIDByName *map[string]int
 var _MapTimesByID *map[int][]string
 
-func cleanJson() {
+func cleanJSON() {
 	cmd := exec.Command("python $HOME/go/src/caltrain-slack/python/jsonCleaner.py")
 	//cmd := exec.Command("cd $GOPATH")
 	fmt.Println(cmd.Run())
@@ -45,7 +47,7 @@ func main() {
 		// for testing
 		port = "5001"
 	}
-	//cleanJson()
+	//cleanJSON()
 	_MapStopByID = getStops("./gtfs/stops.json")
 	_MapStopIDByName = setMapStopIDByName(_MapStopByID)
 	_MapTimesByID = setMapTimesByID(getStoptimes("./gtfs/stoptimes.json"))
@@ -57,17 +59,17 @@ func main() {
 		router.Middleware(web.ShowErrorsMiddleware)
 	}
 
-	router.NotFound((*Context).NotFound).
-		Get("/next/:direction/:stop_name", (*Context).FindStop)
+	router.NotFound((*Context).notFound).
+		Get("/next/:direction/:stop_name", (*Context).findStop)
 	http.ListenAndServe(":"+port, router)
 }
 
-func (c *Context) NotFound(rw web.ResponseWriter, r *web.Request) {
+func (c *Context) notFound(rw web.ResponseWriter, r *web.Request) {
 	rw.WriteHeader(http.StatusNotFound)
 	fmt.Fprintf(rw, "Not Found")
 }
 
-func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
+func (c *Context) findStop(rw web.ResponseWriter, req *web.Request) {
 	direction := req.PathParams["direction"]
 	if direction != "NB" && direction != "SB" {
 		rw.Header().Set("Location", "/")
@@ -159,7 +161,7 @@ func setMapTimesByID(stopTimes *[]model.StopTime) *map[int][]string {
 	var _emptyList []string
 
 	// init map
-	for k, _ := range *_MapStopByID {
+	for k := range *_MapStopByID {
 		timesByID[k] = _emptyList
 	}
 
