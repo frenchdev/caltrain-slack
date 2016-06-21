@@ -4,6 +4,8 @@ go:
 - 1.4
 - 1.5
 - tip
+os:
+  - linux
 script:
 - go build
 notifications:
