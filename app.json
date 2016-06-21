@@ -5,5 +5,11 @@
     "slack",
     "caltrain"
   ],
-  "image": "heroku/go:1.6"
+  "image": "heroku/go:1.6",
+  "env": {
+    "GO_STAGE_NAME" : {
+      "description": "the stage of the app.",
+      "value": "prod"
+    }
+  }
 }

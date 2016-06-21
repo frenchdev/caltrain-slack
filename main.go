@@ -48,10 +48,14 @@ func main() {
 	_MapStopIDByName = setMapStopIDByName(_MapStopByID)
 	_MapTimesByID = setMapTimesByID(getStoptimes("./gtfs/stoptimes.json"))
 
-	router := web.New(Context{}).
-		Middleware(web.LoggerMiddleware).
-		Middleware(web.ShowErrorsMiddleware).
-		NotFound((*Context).NotFound).
+	router := web.New(Context{})
+	router.Middleware(web.LoggerMiddleware)
+
+	if os.Getenv("GO_STAGE_NAME") != "prod" {
+		router.Middleware(web.ShowErrorsMiddleware)
+	}
+
+	router.NotFound((*Context).NotFound).
 		Get("/next/:direction/:stop_name", (*Context).FindStop)
 	http.ListenAndServe(":"+port, router)
 }
