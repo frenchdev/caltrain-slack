@@ -1,3 +1,14 @@
 ./gtfs
 !./gtfs/.gitkeep
 gin-bin.exe
+.idea/caltrain-slack.iml
+.idea/compiler.xml
+.idea/copyright/profiles_settings.xml
+.idea/libraries/GOPATH__caltrain_slack_.xml
+.idea/misc.xml
+.idea/modules.xml
+gtfs/svg/.gitkeep
+gtfs/svg/stoptimes.json
+gtfs/svg/stops.json
+.idea/vcs.xml
+.idea/workspace.xml
