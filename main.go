@@ -53,7 +53,7 @@ func main() {
 		Middleware(web.ShowErrorsMiddleware).
 		NotFound((*Context).NotFound).
 		Get("/next/:direction/:stop_name", (*Context).FindStop)
-	http.ListenAndServe("localhost:"+port, router)
+	http.ListenAndServe(":"+port, router)
 }
 
 func (c *Context) NotFound(rw web.ResponseWriter, r *web.Request) {
