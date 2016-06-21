@@ -12,8 +12,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/frenchdev/caltrain-slack/model"
+	"caltrain-slack/model"
 	"github.com/gocraft/web"
+	"sort"
 )
 
 type Context struct {
@@ -66,13 +67,12 @@ func (c *Context) NotFound(rw web.ResponseWriter, r *web.Request) {
 }
 
 func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
-
 	direction := req.PathParams["direction"]
 	if direction != "NB" && direction != "SB" {
 		rw.Header().Set("Location", "/")
 		rw.WriteHeader(http.StatusMovedPermanently)
 	}
-	stopName := req.PathParams["direction"]
+	stopName := req.PathParams["stop_name"]
 	if stopName == "" {
 		rw.Header().Set("Location", "/")
 		rw.WriteHeader(http.StatusMovedPermanently)
@@ -92,14 +92,10 @@ func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
 	}
 
 	if len(nextTrains) > idx+3 {
-		//fmt.Fprint(rw, json.Marshal(nextTrains[idx:idx+3]))
 		fmt.Fprint(rw, nextTrains[idx:idx+3])
 	} else if len(nextTrains) > idx { // should be a else only
-		//fmt.Fprint(rw, json.Marshal(nextTrains[idx:]))
 		fmt.Fprint(rw, nextTrains[idx:])
 	}
-
-	//fmt.Println(nextTrains[])
 }
 
 func getStops(stopsFilePath string) *map[int]model.Stop {
@@ -168,19 +164,17 @@ func setMapTimesByID(stopTimes *[]model.StopTime) *map[int][]string {
 
 	for _, stopTime := range *stopTimes {
 		if _, ok := timesByID[stopTime.StopID]; ok {
-			// needs to be ordered
 			timesByID[stopTime.StopID] = append(timesByID[stopTime.StopID], stopTime.DepartureTime)
 		}
+	}
+
+	for _, v := range timesByID {
+		sort.Strings(v)
 	}
 
 	return &timesByID
 }
 
 func findTimeIdx(time *string, times *[]string) int {
-	for k, v := range *times {
-		if *time > v {
-			return k - 1
-		}
-	}
-	return -1
+	return sort.Search(len(*times), func(i int) bool { return (*times)[i] >= *time })
 }
