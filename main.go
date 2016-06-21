@@ -63,7 +63,6 @@ func (c *Context) NotFound(rw web.ResponseWriter, r *web.Request) {
 }
 
 func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
-
 	direction := req.PathParams["direction"]
 	if direction != "NB" && direction != "SB" {
 		rw.Header().Set("Location", "/")
@@ -78,7 +77,6 @@ func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
 	hr, min, sec := time.Now().Clock()
 	stringTime := strconv.Itoa(hr) + ":" + strconv.Itoa(min) + ":" + strconv.Itoa(sec)
 
-	stringTime = "17:39:00"
 	stopDir := direction + "_" + stopName
 	stopID := (*_MapStopIDByName)[stopDir]
 
@@ -90,16 +88,10 @@ func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
 	}
 
 	if len(nextTrains) > idx+3 {
-		//fmt.Fprint(rw, json.Marshal(nextTrains[idx:idx+3]))
-		fmt.Fprint(rw, idx)
 		fmt.Fprint(rw, nextTrains[idx:idx+3])
 	} else if len(nextTrains) > idx { // should be a else only
-		//fmt.Fprint(rw, json.Marshal(nextTrains[idx:]))
-		fmt.Fprint(rw, idx)
 		fmt.Fprint(rw, nextTrains[idx:])
 	}
-
-	//fmt.Println(nextTrains[])
 }
 
 func getStops(stopsFilePath string) *map[int]model.Stop {
@@ -168,13 +160,7 @@ func setMapTimesByID(stopTimes *[]model.StopTime) *map[int][]string {
 
 	for _, stopTime := range *stopTimes {
 		if _, ok := timesByID[stopTime.StopID]; ok {
-			//i := sort.Search(len(timesByID[stopTime.StopID]), func(i int) bool { return timesByID[stopTime.StopID][i] >= stopTime.DepartureTime })
 			timesByID[stopTime.StopID] = append(timesByID[stopTime.StopID], stopTime.DepartureTime)
-			//if i < len(timesByID[stopTime.StopID]) {
-			//	timesByID[stopTime.StopID] = append(timesByID[stopTime.StopID], stopTime.DepartureTime)
-			//} else {
-			//	timesByID[stopTime.StopID] = append(timesByID[stopTime.StopID], stopTime.DepartureTime)
-			//}
 		}
 	}
 
@@ -186,13 +172,5 @@ func setMapTimesByID(stopTimes *[]model.StopTime) *map[int][]string {
 }
 
 func findTimeIdx(time *string, times *[]string) int {
-	//i := sort.Search(len(*times), func(i int) bool { return (*times)[i] >= time })
 	return sort.Search(len(*times), func(i int) bool { return (*times)[i] >= *time })
-
-	//for k, v := range *times {
-	//	if *time > v {
-	//		return k - 1
-	//	}
-	//}
-	//return -1
 }
