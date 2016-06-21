@@ -1,7 +1,6 @@
 ./gtfs
 !./gtfs/.gitkeep
 gin-bin.exe
-vendor
 .idea/caltrain-slack.iml
 .idea/compiler.xml
 .idea/copyright/profiles_settings.xml
