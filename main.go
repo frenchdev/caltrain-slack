@@ -9,10 +9,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"time"
-
-	"sort"
 
 	"github.com/frenchdev/caltrain-slack/model"
 	"github.com/gocraft/web"
@@ -89,15 +88,18 @@ func (c *Context) findStop(rw web.ResponseWriter, req *web.Request) {
 
 	nextTrains := (*_MapTimesByID)[stopID]
 
-	idx := findTimeIdx(&stringTime, &nextTrains)
-	if idx == -1 {
-		idx = len(nextTrains) - 1
-	}
-
-	if len(nextTrains) > idx+3 {
-		fmt.Fprint(rw, nextTrains[idx:idx+3])
-	} else if len(nextTrains) > idx { // should be a else only
-		fmt.Fprint(rw, nextTrains[idx:])
+	if nextTrains != nil && len(nextTrains) > 0 {
+		idx := findTimeIdx(&stringTime, &nextTrains)
+		if idx == -1 {
+			idx = len(nextTrains) - 1
+		}
+		if len(nextTrains) > idx+3 {
+			fmt.Fprint(rw, nextTrains[idx:idx+3])
+		} else if len(nextTrains) > idx { // should be a else only
+			fmt.Fprint(rw, nextTrains[idx:])
+		}
+	} else {
+		fmt.Fprint(rw, "{}")
 	}
 }
 
@@ -107,20 +109,15 @@ func getStops(stopsFilePath string) *map[int]model.Stop {
 	if err != nil {
 		fmt.Println("opening stops file: ", err)
 	}
-
 	var stops []model.Stop
-
 	err = json.Unmarshal(stopsFile, &stops)
 	if err != nil {
 		fmt.Println("error:", err)
 	}
-
 	stopMap := make(map[int]model.Stop)
-
 	for _, stop := range stops {
 		stopMap[stop.StopID] = stop
 	}
-
 	return &stopMap
 }
 
@@ -164,17 +161,14 @@ func setMapTimesByID(stopTimes *[]model.StopTime) *map[int][]string {
 	for k := range *_MapStopByID {
 		timesByID[k] = _emptyList
 	}
-
 	for _, stopTime := range *stopTimes {
 		if _, ok := timesByID[stopTime.StopID]; ok {
 			timesByID[stopTime.StopID] = append(timesByID[stopTime.StopID], stopTime.DepartureTime)
 		}
 	}
-
 	for _, v := range timesByID {
 		sort.Strings(v)
 	}
-
 	return &timesByID
 }
 
