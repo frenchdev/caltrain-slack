@@ -27,6 +27,12 @@ type StopDir struct {
 	Direction string
 }
 
+type NextTrain struct {
+	Direction 	string
+	StopName 	string
+	Next		string
+}
+
 var _MapStopByID *map[int]model.Stop
 var _MapStopIDByName *map[string]int
 var _MapTimesByID *map[int][]string
@@ -66,13 +72,11 @@ func (c *Context) NotFound(rw web.ResponseWriter, r *web.Request) {
 func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
 	direction := req.PathParams["direction"]
 	if direction != "NB" && direction != "SB" {
-		rw.Header().Set("Location", "/")
-		rw.WriteHeader(http.StatusMovedPermanently)
+		rw.WriteHeader(http.StatusBadRequest)
 	}
 	stopName := req.PathParams["stop_name"]
 	if stopName == "" {
-		rw.Header().Set("Location", "/")
-		rw.WriteHeader(http.StatusMovedPermanently)
+		rw.WriteHeader(http.StatusBadRequest)
 	}
 
 	hr, min, sec := time.Now().Clock()
@@ -89,10 +93,19 @@ func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
 			idx = len(nextTrains) - 1
 		}
 		if len(nextTrains) > idx+3 {
-			fmt.Fprint(rw, nextTrains[idx:idx+3])
+			nextTrains = nextTrains[idx:idx+3]
+			//fmt.Fprint(rw, nextTrains[idx:idx+3])
 		} else if len(nextTrains) > idx { // should be a else only
-			fmt.Fprint(rw, nextTrains[idx:])
+			nextTrains = nextTrains[idx:]
+			//fmt.Fprint(rw, nextTrains[idx:])
 		}
+		var _nextTrains []NextTrain
+		for _, h := range nextTrains {
+			next := NextTrain{Direction:direction, StopName:stopName, Next:h}
+			_nextTrains = append(_nextTrains, next)
+		}
+		b, _ := json.Marshal(_nextTrains)
+		fmt.Fprint(rw, string(b))
 	} else {
 		fmt.Fprint(rw, "{}")
 	}
