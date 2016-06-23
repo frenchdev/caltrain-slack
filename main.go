@@ -1,5 +1,7 @@
 package main
 
+/* Refactoring needed: */
+
 import (
 	"encoding/json"
 	"fmt"
@@ -60,7 +62,8 @@ func main() {
 		Middleware(web.LoggerMiddleware).
 		Middleware(web.ShowErrorsMiddleware).
 		NotFound((*Context).NotFound).
-		Get("/next/:direction/:stop_name", (*Context).FindStop)
+		Get("/next/:direction/:stop_name", (*Context).FindStop).
+		Get("/stop/:id", (*Context).GetStopDetails)
 	http.ListenAndServe(":"+port, router)
 }
 
@@ -182,4 +185,28 @@ func setMapTimesByID(stopTimes *[]model.StopTime) *map[int][]string {
 
 func findTimeIdx(time *string, times *[]string) int {
 	return sort.Search(len(*times), func(i int) bool { return (*times)[i] >= *time })
+}
+
+func (c *Context) GetStopDetails(rw web.ResponseWriter, req *web.Request) {
+	_id := req.PathParams["id"]
+	if _id == "" {
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(_id)
+	if err != nil {
+		rw.WriteHeader(http.StatusBadRequest)
+		fmt.Println("error:", err)
+	}
+	if v, ok := (*_MapStopByID)[id]; ok {
+		b, err := json.Marshal(v)
+		if err != nil {
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+			fmt.Println("error:", err)
+			return
+		}
+		fmt.Fprint(rw, string(b))
+	} else {
+		rw.WriteHeader(http.StatusNotFound)
+	}
 }
