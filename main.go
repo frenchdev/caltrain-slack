@@ -14,10 +14,15 @@ import (
 	"strconv"
 	"time"
 	"sort"
+	"log"
+	"strings"
+	"sync/atomic"
 
 	"github.com/gocraft/web"
+	_"github.com/polaris1119/go.net/websocket"
 
 	"github.com/caltrain-slack/model"
+	"golang.org/x/net/websocket"
 )
 
 type Context struct {
@@ -45,6 +50,92 @@ func cleanJson() {
 	fmt.Println(cmd.Run())
 }
 
+// These two structures represent the response of the Slack API rtm.start.
+// Only some fields are included. The rest are ignored by json.Unmarshal.
+
+type responseRtmStart struct {
+	Ok    bool         `json:"ok"`
+	Error string       `json:"error"`
+	Url   string       `json:"url"`
+	Self  responseSelf `json:"self"`
+}
+
+type responseSelf struct {
+	Id string `json:"id"`
+}
+
+// slackStart does a rtm.start, and returns a websocket URL and user ID. The
+// websocket URL can be used to initiate an RTM session.
+func slackStart(token string) (wsurl, id string, err error) {
+	url := fmt.Sprintf("https://slack.com/api/rtm.start?token=%s", token)
+	resp, err := http.Get(url)
+	if err != nil {
+		return
+	}
+	if resp.StatusCode != 200 {
+		err = fmt.Errorf("API request failed with code %d", resp.StatusCode)
+		return
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return
+	}
+	var respObj responseRtmStart
+	err = json.Unmarshal(body, &respObj)
+	if err != nil {
+		return
+	}
+
+	if !respObj.Ok {
+		err = fmt.Errorf("Slack error: %s", respObj.Error)
+		return
+	}
+
+	wsurl = respObj.Url
+	id = respObj.Self.Id
+	return
+}
+
+// These are the messages read off and written into the websocket. Since this
+// struct serves as both read and write, we include the "Id" field which is
+// required only for writing.
+
+type Message struct {
+	Id      uint64 `json:"id"`
+	Type    string `json:"type"`
+	Channel string `json:"channel"`
+	Text    string `json:"text"`
+}
+
+func getMessage(ws *websocket.Conn) (m Message, err error) {
+	err = websocket.JSON.Receive(ws, &m)
+	return
+}
+
+var counter uint64
+
+func postMessage(ws *websocket.Conn, m Message) error {
+	m.Id = atomic.AddUint64(&counter, 1)
+	return websocket.JSON.Send(ws, m)
+}
+
+// Starts a websocket-based Real Time API session and return the websocket
+// and the ID of the (bot-)user whom the token belongs to.
+func slackConnect(token string) (*websocket.Conn, string) {
+	wsurl, id, err := slackStart(token)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ws, err := websocket.Dial(wsurl, "", "https://api.slack.com/")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return ws, id
+}
+
 func main() {
 	port := os.Getenv("PORT")
 
@@ -58,13 +149,45 @@ func main() {
 	_MapStopIDByName = setMapStopIDByName(_MapStopByID)
 	_MapTimesByID = setMapTimesByID(getStoptimes("./gtfs/stoptimes.json"))
 
-	router := web.New(Context{}).
-		Middleware(web.LoggerMiddleware).
-		Middleware(web.ShowErrorsMiddleware).
-		NotFound((*Context).NotFound).
-		Get("/next/:direction/:stop_name", (*Context).FindStop).
-		Get("/stop/:id", (*Context).GetStopDetails)
-	http.ListenAndServe(":"+port, router)
+
+	// start a websocket-based Real Time API session
+	ws, id := slackConnect("TOKEN HERE")
+	fmt.Println("caltrainbot ready, ^C exits")
+
+	for {
+		// read each incoming message
+		m, err := getMessage(ws)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// see if we're mentioned
+		if m.Type == "message" && strings.HasPrefix(m.Text, "<@"+id+">") {
+			// if so try to parse if
+			parts := strings.Fields(m.Text)
+			fmt.Println(parts)
+			if len(parts) >= 4 && parts[1] == "next" {
+				// looks good, get the quote and reply with the result
+				go func(m Message) {
+					m.Text = SearchNext(parts[2], strings.Join(parts[3:], " "))
+					postMessage(ws, m)
+				}(m)
+				// NOTE: the Message object is copied, this is intentional
+			} else {
+				// huh?
+				m.Text = fmt.Sprintf("sorry, that does not compute\n")
+				postMessage(ws, m)
+			}
+		}
+	}
+
+	//router := web.New(Context{}).
+	//	Middleware(web.LoggerMiddleware).
+	//	Middleware(web.ShowErrorsMiddleware).
+	//	NotFound((*Context).NotFound).
+	//	Get("/next/:direction/:stop_name", (*Context).FindStop).
+	//	Get("/stop/:id", (*Context).GetStopDetails)
+	//http.ListenAndServe(":"+port, router)
 }
 
 func (c *Context) NotFound(rw web.ResponseWriter, r *web.Request) {
@@ -82,10 +205,45 @@ func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
 		rw.WriteHeader(http.StatusBadRequest)
 	}
 
+	fmt.Fprint(rw, SearchNext(direction, stopName))
+
+	//hr, min, sec := time.Now().Clock()
+	//stringTime := strconv.Itoa(hr) + ":" + strconv.Itoa(min) + ":" + strconv.Itoa(sec)
+	//
+	//stopDir := direction + "_" + stopName
+	//stopID := (*_MapStopIDByName)[stopDir]
+	//
+	//nextTrains := (*_MapTimesByID)[stopID]
+	//
+	//if nextTrains != nil && len(nextTrains) > 0 {
+	//	idx := findTimeIdx(&stringTime, &nextTrains)
+	//	if idx == -1 {
+	//		idx = len(nextTrains) - 1
+	//	}
+	//	if len(nextTrains) > idx+3 {
+	//		nextTrains = nextTrains[idx:idx+3]
+	//		//fmt.Fprint(rw, nextTrains[idx:idx+3])
+	//	} else if len(nextTrains) > idx { // should be a else only
+	//		nextTrains = nextTrains[idx:]
+	//		//fmt.Fprint(rw, nextTrains[idx:])
+	//	}
+	//	var _nextTrains []NextTrain
+	//	for _, h := range nextTrains {
+	//		next := NextTrain{Direction:direction, StopName:stopName, Next:h}
+	//		_nextTrains = append(_nextTrains, next)
+	//	}
+	//	b, _ := json.Marshal(_nextTrains)
+	//	fmt.Fprint(rw, string(b))
+	//} else {
+	//	fmt.Fprint(rw, "{}")
+	//}
+}
+
+func SearchNext(dir string, stop string) string {
 	hr, min, sec := time.Now().Clock()
 	stringTime := strconv.Itoa(hr) + ":" + strconv.Itoa(min) + ":" + strconv.Itoa(sec)
 
-	stopDir := direction + "_" + stopName
+	stopDir := dir + "_" + stop
 	stopID := (*_MapStopIDByName)[stopDir]
 
 	nextTrains := (*_MapTimesByID)[stopID]
@@ -97,21 +255,23 @@ func (c *Context) FindStop(rw web.ResponseWriter, req *web.Request) {
 		}
 		if len(nextTrains) > idx+3 {
 			nextTrains = nextTrains[idx:idx+3]
-			//fmt.Fprint(rw, nextTrains[idx:idx+3])
 		} else if len(nextTrains) > idx { // should be a else only
 			nextTrains = nextTrains[idx:]
-			//fmt.Fprint(rw, nextTrains[idx:])
 		}
 		var _nextTrains []NextTrain
 		for _, h := range nextTrains {
-			next := NextTrain{Direction:direction, StopName:stopName, Next:h}
+			next := NextTrain{Direction:dir, StopName:stop, Next:h}
 			_nextTrains = append(_nextTrains, next)
 		}
 		b, _ := json.Marshal(_nextTrains)
-		fmt.Fprint(rw, string(b))
+		return string(b)
 	} else {
-		fmt.Fprint(rw, "{}")
+		return "{}"
 	}
+}
+
+func PrintSearchNext(dir string, stop string) string {
+	return fmt.Sprintf("%s", SearchNext(dir, stop))
 }
 
 func getStops(stopsFilePath string) *map[int]model.Stop {
