@@ -9,7 +9,6 @@ import (
 	"log"
 	_ "log"
 	"net/http"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -18,9 +17,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/net/websocket"
+
 	"github.com/frenchdev/caltrain-slack/model"
 	"github.com/gocraft/web"
-	_ "github.com/polaris1119/go.net/websocket"
+
+	"os"
 
 	_ "golang.org/x/net/websocket"
 )
@@ -44,7 +46,8 @@ type NextTrain struct {
 
 var _MapStopByID *map[int]model.Stop
 var _MapStopIDByName *map[string]int
-var _MapTimesByID *map[int][]string
+var _MapTimesByIDWeekDay *map[int][]string
+var _MapTimesByIDWeekEnd *map[int][]string
 
 func cleanJSON() {
 	cmd := exec.Command("python $HOME/go/src/caltrain-slack/python/jsonCleaner.py")
@@ -139,31 +142,29 @@ func slackConnect(token string) (*websocket.Conn, string) {
 }
 
 func main() {
-	port := os.Getenv("PORT")
+	//port := os.Getenv("PORT")
+	//
+	//if port == "" {
+	//	//log.Fatal("$PORT must be set")
+	//	// for testing
+	//	port = "5001"
+	//}
 
-	if port == "" {
-		//log.Fatal("$PORT must be set")
-		// for testing
-		port = "5001"
+	token := ""
+	if len(os.Args) > 1 {
+		token = os.Args[1]
+	} else {
+		fmt.Println("Error no token")
+		os.Exit(4)
 	}
-	//cleanJSON()
+
+	//cleanJson()
 	_MapStopByID = getStops("./gtfs/stops.json")
 	_MapStopIDByName = setMapStopIDByName(_MapStopByID)
-	_MapTimesByID = setMapTimesByID(getStoptimes("./gtfs/stoptimes.json"))
-
-	// router := web.New(Context{})
-	// router.Middleware(web.LoggerMiddleware)
-	//
-	// if os.Getenv("GO_STAGE_NAME") != "prod" {
-	// 	router.Middleware(web.ShowErrorsMiddleware)
-	// }
-	//
-	// router.NotFound((*Context).notFound).
-	// 	Get("/next/:direction/:stop_name", (*Context).findStop)
-	// http.ListenAndServe(":"+port, router)
+	_MapTimesByIDWeekDay, _MapTimesByIDWeekEnd = setMapTimesByID(getStoptimes("./gtfs/stoptimes.json"))
 
 	// start a websocket-based Real Time API session
-	ws, id := slackConnect("TOKEN HERE")
+	ws, id := slackConnect(token)
 	fmt.Println("caltrainbot ready, ^C exits")
 
 	for {
@@ -195,10 +196,14 @@ func main() {
 
 	//router := web.New(Context{}).
 	//	Middleware(web.LoggerMiddleware).
-	//	Middleware(web.ShowErrorsMiddleware).
 	//	NotFound((*Context).NotFound).
 	//	Get("/next/:direction/:stop_name", (*Context).FindStop).
 	//	Get("/stop/:id", (*Context).GetStopDetails)
+
+	//if os.Getenv("GO_STAGE_NAME") != "prod" {
+	//	router.Middleware(web.ShowErrorsMiddleware)
+	//}
+
 	//http.ListenAndServe(":"+port, router)
 }
 
@@ -218,37 +223,6 @@ func (c *Context) findStop(rw web.ResponseWriter, req *web.Request) {
 	}
 
 	fmt.Fprint(rw, SearchNext(direction, stopName))
-
-	//hr, min, sec := time.Now().Clock()
-	//stringTime := strconv.Itoa(hr) + ":" + strconv.Itoa(min) + ":" + strconv.Itoa(sec)
-	//
-	//stopDir := direction + "_" + stopName
-	//stopID := (*_MapStopIDByName)[stopDir]
-	//
-	//nextTrains := (*_MapTimesByID)[stopID]
-	//
-	//if nextTrains != nil && len(nextTrains) > 0 {
-	//	idx := findTimeIdx(&stringTime, &nextTrains)
-	//	if idx == -1 {
-	//		idx = len(nextTrains) - 1
-	//	}
-	//	if len(nextTrains) > idx+3 {
-	//		nextTrains = nextTrains[idx:idx+3]
-	//		//fmt.Fprint(rw, nextTrains[idx:idx+3])
-	//	} else if len(nextTrains) > idx { // should be a else only
-	//		nextTrains = nextTrains[idx:]
-	//		//fmt.Fprint(rw, nextTrains[idx:])
-	//	}
-	//	var _nextTrains []NextTrain
-	//	for _, h := range nextTrains {
-	//		next := NextTrain{Direction:direction, StopName:stopName, Next:h}
-	//		_nextTrains = append(_nextTrains, next)
-	//	}
-	//	b, _ := json.Marshal(_nextTrains)
-	//	fmt.Fprint(rw, string(b))
-	//} else {
-	//	fmt.Fprint(rw, "{}")
-	//}
 }
 
 func SearchNext(dir string, stop string) string {
@@ -257,8 +231,13 @@ func SearchNext(dir string, stop string) string {
 
 	stopDir := dir + "_" + stop
 	stopID := (*_MapStopIDByName)[stopDir]
+	var nextTrains []string
 
-	nextTrains := (*_MapTimesByID)[stopID]
+	if time.Now().Weekday() == time.Saturday || time.Now().Weekday() == time.Sunday {
+		nextTrains = (*_MapTimesByIDWeekEnd)[stopID]
+	} else {
+		nextTrains = (*_MapTimesByIDWeekDay)[stopID]
+	}
 
 	if nextTrains != nil && len(nextTrains) > 0 {
 		idx := findTimeIdx(&stringTime, &nextTrains)
@@ -280,10 +259,6 @@ func SearchNext(dir string, stop string) string {
 	} else {
 		return "{}"
 	}
-}
-
-func PrintSearchNext(dir string, stop string) string {
-	return fmt.Sprintf("%s", SearchNext(dir, stop))
 }
 
 func getStops(stopsFilePath string) *map[int]model.Stop {
@@ -336,23 +311,34 @@ func setMapStopIDByName(stops *map[int]model.Stop) *map[string]int {
 	return &stopIDByName
 }
 
-func setMapTimesByID(stopTimes *[]model.StopTime) *map[int][]string {
-	timesByID := make(map[int][]string)
+func setMapTimesByID(stopTimes *[]model.StopTime) (*map[int][]string, *map[int][]string) {
+	timesByIDWeekDay := make(map[int][]string)
+	timesByIDWeekEnd := make(map[int][]string)
 	var _emptyList []string
 
 	// init map
-	for k := range *_MapStopByID {
-		timesByID[k] = _emptyList
+	for k, _ := range *_MapStopByID {
+		timesByIDWeekDay[k] = _emptyList
+		timesByIDWeekEnd[k] = _emptyList
 	}
 	for _, stopTime := range *stopTimes {
-		if _, ok := timesByID[stopTime.StopID]; ok {
-			timesByID[stopTime.StopID] = append(timesByID[stopTime.StopID], stopTime.DepartureTime)
+		if strings.HasPrefix(stopTime.TripID, "8") || strings.HasPrefix(stopTime.TripID, "4") {
+			if _, ok := timesByIDWeekEnd[stopTime.StopID]; ok {
+				timesByIDWeekEnd[stopTime.StopID] = append(timesByIDWeekEnd[stopTime.StopID], stopTime.DepartureTime)
+			}
+		} else {
+			if _, ok := timesByIDWeekDay[stopTime.StopID]; ok {
+				timesByIDWeekDay[stopTime.StopID] = append(timesByIDWeekDay[stopTime.StopID], stopTime.DepartureTime)
+			}
 		}
 	}
-	for _, v := range timesByID {
+	for _, v := range timesByIDWeekDay {
 		sort.Strings(v)
 	}
-	return &timesByID
+	for _, v := range timesByIDWeekEnd {
+		sort.Strings(v)
+	}
+	return &timesByIDWeekDay, &timesByIDWeekEnd
 }
 
 func findTimeIdx(time *string, times *[]string) int {
