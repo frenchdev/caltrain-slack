@@ -192,10 +192,14 @@ func main() {
 
 	//router := web.New(Context{}).
 	//	Middleware(web.LoggerMiddleware).
-	//	Middleware(web.ShowErrorsMiddleware).
 	//	NotFound((*Context).NotFound).
 	//	Get("/next/:direction/:stop_name", (*Context).FindStop).
 	//	Get("/stop/:id", (*Context).GetStopDetails)
+
+	//if os.Getenv("GO_STAGE_NAME") != "prod" {
+	//	router.Middleware(web.ShowErrorsMiddleware)
+	//}
+
 	//http.ListenAndServe(":"+port, router)
 }
 
